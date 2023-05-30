@@ -7,7 +7,8 @@ library(sf)
 geodata <- st_read("geodata.gpkg")
   
 # map variable VAR of the geodata
+
 ggplot(data = geodata) +
   geom_sf(aes(fill = VAR)  +
-  scale_fill_viridis_c(option = "viridis")
+  scale_fill_viridis_c(option = "viridis"))
 
