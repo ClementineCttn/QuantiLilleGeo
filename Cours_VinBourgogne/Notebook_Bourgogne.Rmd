@@ -85,3 +85,222 @@ ggplot(data = communes) +
 
 ```
 
+## Création de variables niveau 2 à partir d'aggrégation de données niveau 1
+
+Info sur la distribution des prix, des surfaces, des qualités physiques des vignobles, etc.
+```{r}
+
+Vignobles_par_communes <- as_tibble(vignobles) %>%
+  group_by(LIBCOM) %>%
+  summarise(aire_vignoble = sum(SURFACE),
+            MoyPond_b = sum(SCORE_b * SURFACE) / sum(SURFACE),
+            N_Parcelles = n(),
+            Prix_moyen = mean(PrixMoy,na.rm=T),
+            Prix_median = median(PrixMoy,na.rm=T),
+            ) 
+```
+
+
+Info sur les appellations d'origine contrôlée:
+```{r}
+Vignobles_par_communes_par_AOC <- as_tibble(vignobles) %>%
+  group_by(LIBCOM, NIVEAU) %>%
+  summarise(N_Parcelles = n()
+  ) %>%  
+  pivot_wider(names_from = NIVEAU, values_from = N_Parcelles) %>%
+  replace_na(list(`Bourgogne` = 0,
+                  `Grand cru`=0,
+                  `Premier cru`=0,
+                  `Village`=0,
+                  `Coteaux b.`=0))
+```
+
+## Jointure et proportions d'AOC
+```{r}
+
+communes_final <- left_join(Vignobles_par_communes,
+Vignobles_par_communes_par_AOC, by="LIBCOM") %>%
+  left_join(communes,., by=c("nom_comm"="LIBCOM")) %>%
+  mutate(share_Bourgogne = `Bourgogne` / N_Parcelles * 100,
+         share_GdCru = `Grand cru` / N_Parcelles * 100,
+         share_PmCru = `Premier cru` / N_Parcelles * 100,
+         share_Village = `Village` / N_Parcelles * 100,
+         share_Coteau = `Coteaux b.` / N_Parcelles * 100,
+         share_PmGrCru = (`Premier cru`  + `Grand cru`) / N_Parcelles * 100,
+         share_PmGrCruVill = (`Premier cru`  + `Grand cru` + `Village`) / N_Parcelles * 100)
+
+
+head(communes_final)
+
+# Prix moyen des vins estimés par commune
+ggplot(data = communes_final) +
+  geom_sf(aes(fill = Prix_moyen), lwd=0.01, colour="white")  +
+  scale_fill_gradient(low = "white", high="red") +
+  geom_text_repel(data = communes_final[communes_final$Prix_moyen > 100 ,],
+                  aes(label = nom_comm, geometry = geometry),
+                  stat = "sf_coordinates",size=3, colour="black")
+
+
+
+# Qualité moyenne des parcelles par commune
+ggplot(data = communes_final) +
+  geom_sf(aes(fill = MoyPond_b), lwd=0.01, colour="white")  +
+  scale_fill_gradient(low = "white", high="goldenrod4") + 
+  geom_text_repel(data = communes_final[communes_final$MoyPond_b > 80
+                                      | communes_final$MoyPond_b < 65 ,], 
+                  aes(label = nom_comm, geometry = geometry),
+                  stat = "sf_coordinates",size=3, colour="black")
+
+# Proportion de parcelles en grand cru par commune
+ggplot(data = communes_final) +
+  geom_sf(aes(fill = share_GdCru), lwd=0.01, colour="white")  +
+  scale_fill_gradient(low = "white", high="goldenrod") +
+  geom_text_repel(data = communes_final[communes_final$share_GdCru > 8 ,],
+                  aes(label = nom_comm, geometry = geometry),
+                  stat = "sf_coordinates",size=3, colour="black")
+
+
+# Proportion de parcelles en premier ou grand cru par commune
+ggplot(data = communes_final) +
+  geom_sf(aes(fill = share_PmGrCru), lwd=0.01, colour="white")  +
+  scale_fill_gradient(low = "white", high="gold") +
+  geom_text_repel(data = communes_final[communes_final$share_PmGrCru > 30 ,],
+                  aes(label = nom_comm, geometry = geometry),
+                  stat = "sf_coordinates",size=3, colour="black")
+
+```
+
+## Rapatriation des données communes au niveau vignoble
+
+```{r}
+communes_final_tib <- as_tibble(communes_final) %>%
+  select(-geometry)
+
+vignobles_final <- left_join(vignobles,communes_final_tib, 
+                              by=c("LIBCOM"= "nom_comm"))
+
+summary(vignobles_final)
+```
+
+
+# Modélisation multiniveaux
+
+## variable a expliquer: le prix moyen du 🍷 
+
+```{r}
+summary(vignobles_final$PrixMoy)
+
+ggplot(data=vignobles_final, aes(x=PrixMoy)) +
+  geom_histogram(fill="coral1")
+
+# Passage en log pour une distribution plus normale
+vignobles_final$LogPrix <- log(vignobles_final$PrixMoy)
+
+ggplot(data=vignobles_final, aes(x=LogPrix)) +
+  geom_histogram(fill="coral3") +
+  geom_vline(aes(xintercept=mean(LogPrix)),   
+             color="black", linetype="dashed", size=1)
+
+
+```
+
+## variables explicatives niveau 1:
+```{r}
+#Score qualité geographique (pente, geologie, pedologie, precipitations):
+ggplot(data=vignobles_final, aes(x=SCORE_b)) +
+  geom_histogram(fill="brown1")
+
+#Surface:
+ggplot(data=vignobles_final, aes(x=SURFACE)) +
+  geom_histogram(fill="brown2")
+
+#Niveau d'aoc:
+positions <- c("Coteaux b.", "Bourgogne", "Village",
+               "Premier cru", "Grand cru")
+ggplot(data=vignobles_final, aes(x=NIVEAU)) +
+  geom_bar(fill="brown3") +
+  scale_x_discrete(limits = positions)
+
+#Source info prix:
+ggplot(data=vignobles_final, aes(x=Source)) +
+   geom_bar(fill="brown4") 
+```
+
+## variables explicatives niveau 2:
+```{r}
+
+#Population de la commune
+ggplot(data=communes_final, aes(x=population)) +
+  geom_histogram(fill="aquamarine1", bins = 5)
+
+#Part de grand et premier cru de la commune
+ggplot(data=communes_final, aes(x=share_PmGrCru)) +
+  geom_histogram(fill="aquamarine3", bins = 5)
+
+#Cote de nuit ou cote de beaune:
+pos_cote <- c("Côte de Nuit", "Côte de Beane", "Côte D'or")
+ggplot(data=communes_final, aes(x=Cote)) +
+  geom_bar(fill="aquamarine4") +
+  scale_x_discrete(limits = pos_cote)
+
+#Qualite moyenne de la commune
+ggplot(data=communes_final, aes(x=MoyPond_b)) +
+  geom_histogram(fill="darkslategrey", bins = 5)
+
+```
+
+## Centrage-réduction-sélection des variables
+
+```{r}
+vignobles_final_cr <- vignobles_final %>%
+  mutate(LogPrix = scale(as.numeric(LogPrix)), 
+         Surface = scale(as.numeric(SURFACE)), 
+         Quality = scale(as.numeric(SCORE_b)), 
+         MeanQuality = scale(as.numeric(MoyPond_b)), 
+         ShareGdCru = scale(as.numeric(share_GdCru))) %>%
+  select(LogPrix, Surface, Quality, MeanQuality, ShareGdCru,
+         LIBCOM, Source, Cote, Concat)
+
+summary_stat <- data.frame()
+```
+
+## Modèle à un seul niveau
+
+```{r}
+L1 <- lm(LogPrix~Quality+Surface+Source, data=vignobles_final_cr)
+
+summary(L1)
+```
+
+## Modèle nul à 2 niveaux
+
+```{r}
+mnnull <- lmer(LogPrix ~ 1 + (1 | LIBCOM), data=vignobles_final_cr, REML=F, na.action=na.omit)
+summary(mnnull)
+
+# La variance résiduelle du niveau commune est de: 1.34
+vrn2 <- summary(mnnull)$varcor[1][[1]][[1]]
+# La variance résiduelle du niveau vignoble est de: 0.25
+vrn1 <- as.data.frame(summary(mnnull)$varcor)[2,]$vcov 
+# Donc la correlation intraclasse ICC est de 0.84
+icc <- vrn2 / (vrn1 + vrn2)
+icc
+
+# Ou plus simplement
+performance::icc(mnnull)
+
+summary_stat["MNNull","N"] <- dim(mnnull@frame)[1] 
+summary_stat["MNNull","LogLik" ] <- summary(mnnull)$AIC[3][[1]] 
+summary_stat["MNNull", "AIC" ] <-summary(mnnull)$AIC[1][[1]]
+summary_stat["MNNull", "BIC" ] <- summary(mnnull)$AIC[2][[1]]
+summary_stat["MNNull", "Deviance" ] <- summary(mnnull)$AIC[4][[1]]
+summary_stat["MNNull", "Total_Var" ] <- vrn2 + vrn1
+summary_stat["MNNull", "ICC" ] <- performance::icc(mnnull)[[1]]
+summary_stat["MNNull", "InterClass" ] <- vrn1 / (vrn2 + vrn1)
+
+
+summary_stat
+
+
+```
+
