@@ -257,6 +257,7 @@ vignobles_final_cr <- vignobles_final %>%
          Surface = scale(as.numeric(SURFACE)), 
          Quality = scale(as.numeric(SCORE_b)), 
          AOC = fct_reorder(NIVEAU, SCORE_b),
+         Cote = fct_reorder(Cote, SCORE_b),
          MeanQuality = scale(as.numeric(MoyPond_b)), 
          ShareGdCru = scale(as.numeric(share_GdCru))) %>%
   select(LogPrix, Surface, Quality, AOC,
@@ -276,7 +277,9 @@ L1 <- lm(LogPrix~Quality+Surface+AOC+Source, data=vignobles_final_cr)
 summary(L1)
 ```
 
-Comme prévu, les vignobles de grandes surfaces ont des prix en moyenne moins élevés ("ce qui est rare est cher"). Par contre, la qualité physique des vignobles est non-significative dans le modèle des prix à un niveau.
+- Comme prévu, les vignobles de grandes **surfaces** ont des prix en moyenne moins élevés ("ce qui est rare est cher"), et les AOC **"Grands Crus"** sont significativement plus chers que les AOC Côteaux Bourguignons.
+- En revanche, la **qualité physique** des vignobles est non-significative dans le modèle des prix à un niveau, et les AOC "Bourgogne" et "Village" sont significativement **moins** chers que les AOC Côteaux Bourguignons.
+
 
 ## Modèle nul à 2 niveaux
 
@@ -336,7 +339,7 @@ ggplot(data = mnnull_ranef) +
                   stat = "sf_coordinates",size=3, colour="black")
 ```
 
-À Comparer avec la carte originale des prix moyens par commune
+À comparer avec la carte originale des prix moyens par commune
 = différence de centrage-réduction.
 
 ```{r}
@@ -386,8 +389,7 @@ colnames(mn1_residuals)[length(colnames(vignobles_final_cr))] <- "residusN1"
 
 summary(mn1_residuals$residusN1)
 
-ggplot(data = 
-mn1_residuals) +
+ggplot(data = mn1_residuals) +
   geom_sf(aes(fill = residusN1), lwd=0.01, colour="white")  +
   scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkorange") + 
   theme_minimal() 
@@ -425,8 +427,10 @@ summary(mn2)
 
 - La relation entre prix et surface est toujours inversée: les vignobles de grandes surfaces ont des prix en moyenne significativement **plus** élevés.
 - La qualité physique des vignobles est toujours **négativement** (et significativement) associée aux prix dans ce modèle.
+- L'AOC "Grand Cru" est **positivement** (et significativement) associée aux prix du vin dans ce modèle, mais moins fortement que la part de grands crus présents dans la commune (`ShareGdCru`).
+- Par rapport à la Côte de Beaune, les vins de la Côte de Nuit se vendent très significativement plus chers.
 - L'ajout des variables de niveaux 1 et 2 a permis de réduire la variance totale de `r round(100*((1 - (summary(mn2)$varcor[1][[1]][[1]] + as.data.frame(summary(mn2)$varcor)[2,]$vcov) / (vrn2 + vrn1) )),1)`%.
-- La part de variance liée à l'appartenance communale est maintenant de `r 100-round(performance::icc(mn2)[[1]]*100,1)`%.
+- La variance interclasse est maintenant de `r 100-round(performance::icc(mn2)[[1]]*100,1)`%.
 
 ```{r}
 summary_stat["MNVar2Niv","N"] <- dim(mn2@frame)[1] 
@@ -442,4 +446,40 @@ summary_stat["MNVar2Niv", "PseudoR2" ] <-
   (1 - (summary_stat["MNVar2Niv", "Total_Var" ]  / summary_stat["MNNull", "Total_Var" ] )) 
 summary_stat
 ```
+
+
+Résidus de niveau 1
+
+```{r}
+
+mn2_residuals <- cbind(vignobles_final_cr, residuals(mn2))
+colnames(mn2_residuals)[length(colnames(vignobles_final_cr))] <- "residusN1"
+
+
+ggplot(data = mn2_residuals) +
+  geom_sf(aes(fill = residusN1), lwd=0.01, colour="white")  +
+  scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkorange") + 
+  theme_minimal() 
+
+```
+
+
+
+Résidus de niveau 2
+
+```{r}
+ranef <- ranef(mn2)$LIBCOM %>%
+  mutate(LIBCOM = as.character(rownames(.)),
+         residuCom = as.numeric(`(Intercept)`))
+
+mn2_ranef <- left_join(communes_final, ranef, by=c("nom_comm"="LIBCOM"))
+
+ggplot(data = mn2_ranef) +
+  geom_sf(aes(fill = residuCom), lwd=0.01, colour="white")  +
+  scale_fill_gradient2(low = "#00008B", mid = "white", high = "#800020") +
+  geom_text_repel(data = mn2_ranef[abs(mn2_ranef$residuCom) > 1,],
+                        aes(label = nom_comm, geometry = geometry),
+                  stat = "sf_coordinates",size=3, colour="black")
+```
+
 
