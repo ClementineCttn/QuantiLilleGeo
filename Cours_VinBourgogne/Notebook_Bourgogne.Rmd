@@ -1,0 +1,87 @@
+---
+title: "R Notebook Quantilille 2023"
+author: "Clémentine Cottineau & Julie Vallée"
+date: "30-06-2023"
+output:
+  html_document:
+    df_print: paged
+subtitle: "Module multiniveaux - Aspects géographiques"
+---
+
+# Mise en place 
+
+## Chargement des packages:
+
+```{r, message=FALSE}
+library(lme4) # pour la modélisation multiniveau
+library(multilevelTools) # pour l'analyse des modèles
+library(lmerTest) # pour l'évaluation des modèles
+library(sf) # pour les objets spatiaux (cartes)
+library(tidyverse) # pour la manipulation des données
+library(readxl) # pour ouvrir les fichiers xlsx
+library(ggrepel) # pour des étiquettes de graphiques propres
+```
+
+## Chargement des données:
+
+### Jeu de données de niveau 1
+
+Il s'agit des vignobles de Bourgogne. On a dans un tableau les caractéristiques de 2391 vignobles en termes de:
+
+- prix moyen du vin
+- qualité pédologique et météo (radiations solaires, pluie, etc.)
+- appellation d'origine contrôlée en 5 niveaux (Côteaux bourgignons <  Bourgogne < Village < Premier cru < Grand cru.)
+- surface
+
+
+```{r}
+vignobles <- st_read("Data/Geo/Vignobles_prix.shp",
+                     stringsAsFactors = T) %>% 
+  st_transform(crs = "EPSG:2154")
+summary(vignobles)
+
+vignobles %>% 
+  dplyr::filter(LIBCOM == "FLAGEY-ECHEZEAUX" & NIVEAU == "Premier cru")
+
+```
+
+
+### Jeu de données de niveau 2
+
+Il s'agit des communes de Côte d'Or. On a dans un tableau les caractéristiques de 31 communes en termes de:
+
+- superficie
+- population
+- côte d'appellation
+- hierarchie administrative
+
+
+```{r}
+communes <- st_read("Data/Geo/communes.shp",
+                     stringsAsFactors = T) %>% 
+  st_transform(crs = "EPSG:2154")
+summary(communes)
+
+```
+
+## Visualisation des données:
+
+Avec `ggplot`, utilisation de `geom_sf` pour les objets spatiaux.
+
+```{r}
+ggplot(data = vignobles) +
+  geom_sf(aes(fill = log(PrixMoy)), lwd=0.01, colour="white")  +
+  scale_fill_viridis_c(option = "viridis")
+```
+
+Pour des étiquettes réactives, on utilise `geom_text_repel`:
+
+```{r}
+ggplot(data = communes) +
+  geom_sf(aes(fill = Cote), lwd=0.01, colour="white") +
+  geom_text_repel(data = communes[communes$population > 1,],
+                        aes(label = nom_comm, geometry = geometry),
+                  stat = "sf_coordinates",size=3, colour="black")
+
+```
+
