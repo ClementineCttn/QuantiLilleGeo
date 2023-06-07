@@ -256,9 +256,11 @@ vignobles_final_cr <- vignobles_final %>%
   mutate(LogPrix = scale(as.numeric(LogPrix)), 
          Surface = scale(as.numeric(SURFACE)), 
          Quality = scale(as.numeric(SCORE_b)), 
+         AOC = fct_reorder(NIVEAU, SCORE_b),
          MeanQuality = scale(as.numeric(MoyPond_b)), 
          ShareGdCru = scale(as.numeric(share_GdCru))) %>%
-  select(LogPrix, Surface, Quality, MeanQuality, ShareGdCru,
+  select(LogPrix, Surface, Quality, AOC,
+         MeanQuality, ShareGdCru,
          LIBCOM, Source, Cote, Concat) %>%
   na.omit
 
@@ -269,7 +271,7 @@ summary_stat <- data.frame()
 ## Modèle à un seul niveau
 
 ```{r}
-L1 <- lm(LogPrix~Quality+Surface+Source, data=vignobles_final_cr)
+L1 <- lm(LogPrix~Quality+Surface+AOC+Source, data=vignobles_final_cr)
 
 summary(L1)
 ```
@@ -350,7 +352,8 @@ ggplot(data = communes_final) +
 ## Modèle multiniveau avec variables de niveau 1 uniquement
 
 ```{r}
-mn1 <- lmer(LogPrix ~ Quality + Surface + Source + (1 | LIBCOM), data=vignobles_final_cr, REML=F, na.action=na.omit)
+mn1 <- lmer(LogPrix ~ Quality + Surface + Source + AOC +
+              (1 | LIBCOM), data=vignobles_final_cr, REML=F, na.action=na.omit)
 summary(mn1)
 ```
 
@@ -380,12 +383,14 @@ Résidus de niveau 1
 
 mn1_residuals <- cbind(vignobles_final_cr, residuals(mn1))
 colnames(mn1_residuals)[length(colnames(vignobles_final_cr))] <- "residusN1"
+
 summary(mn1_residuals$residusN1)
 
 ggplot(data = 
 mn1_residuals) +
   geom_sf(aes(fill = residusN1), lwd=0.01, colour="white")  +
-  scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkorange") 
+  scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkorange") + 
+  theme_minimal() 
 
 ```
 
@@ -406,3 +411,35 @@ ggplot(data = mn1_ranef) +
                         aes(label = nom_comm, geometry = geometry),
                   stat = "sf_coordinates",size=3, colour="black")
 ```
+
+
+
+## Modèle multiniveau avec variables de niveau 1 et 2
+
+```{r}
+mn2 <- lmer(LogPrix ~ Quality + Surface + Source + AOC +
+               MeanQuality + ShareGdCru + Cote +
+              (1 | LIBCOM), data=vignobles_final_cr, REML=F, na.action=na.omit)
+summary(mn2)
+```
+
+- La relation entre prix et surface est toujours inversée: les vignobles de grandes surfaces ont des prix en moyenne significativement **plus** élevés.
+- La qualité physique des vignobles est toujours **négativement** (et significativement) associée aux prix dans ce modèle.
+- L'ajout des variables de niveaux 1 et 2 a permis de réduire la variance totale de `r round(100*((1 - (summary(mn2)$varcor[1][[1]][[1]] + as.data.frame(summary(mn2)$varcor)[2,]$vcov) / (vrn2 + vrn1) )),1)`%.
+- La part de variance liée à l'appartenance communale est maintenant de `r 100-round(performance::icc(mn2)[[1]]*100,1)`%.
+
+```{r}
+summary_stat["MNVar2Niv","N"] <- dim(mn2@frame)[1] 
+summary_stat["MNVar2Niv","LogLik" ] <- summary(mn2)$AIC[3][[1]] 
+summary_stat["MNVar2Niv", "AIC" ] <-summary(mn2)$AIC[1][[1]]
+summary_stat["MNVar2Niv", "BIC" ] <- summary(mn2)$AIC[2][[1]]
+summary_stat["MNVar2Niv", "Deviance" ] <- summary(mn2)$AIC[4][[1]]
+summary_stat["MNVar2Niv", "Total_Var" ] <-
+  summary(mn2)$varcor[1][[1]][[1]] + as.data.frame(summary(mn2)$varcor)[2,]$vcov 
+summary_stat["MNVar2Niv", "ICC" ] <- performance::icc(mn2)[[1]]
+summary_stat["MNVar2Niv", "InterClass" ] <- 1 -  performance::icc(mn2)[[1]]
+summary_stat["MNVar2Niv", "PseudoR2" ] <- 
+  (1 - (summary_stat["MNVar2Niv", "Total_Var" ]  / summary_stat["MNNull", "Total_Var" ] )) 
+summary_stat
+```
+
