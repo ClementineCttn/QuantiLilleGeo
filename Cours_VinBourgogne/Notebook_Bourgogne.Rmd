@@ -259,7 +259,9 @@ vignobles_final_cr <- vignobles_final %>%
          MeanQuality = scale(as.numeric(MoyPond_b)), 
          ShareGdCru = scale(as.numeric(share_GdCru))) %>%
   select(LogPrix, Surface, Quality, MeanQuality, ShareGdCru,
-         LIBCOM, Source, Cote, Concat)
+         LIBCOM, Source, Cote, Concat) %>%
+  na.omit
+
 
 summary_stat <- data.frame()
 ```
@@ -374,6 +376,18 @@ summary_stat
 
 Résidus de niveau 1
 
+```{r}
+
+mn1_residuals <- cbind(vignobles_final_cr, residuals(mn1))
+colnames(mn1_residuals)[length(colnames(vignobles_final_cr))] <- "residusN1"
+summary(mn1_residuals$residusN1)
+
+ggplot(data = 
+mn1_residuals) +
+  geom_sf(aes(fill = residusN1), lwd=0.01, colour="white")  +
+  scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkorange") 
+
+```
 
 
 Résidus de niveau 2
