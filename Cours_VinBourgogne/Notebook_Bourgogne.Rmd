@@ -272,23 +272,35 @@ L1 <- lm(LogPrix~Quality+Surface+Source, data=vignobles_final_cr)
 summary(L1)
 ```
 
+Comme prévu, les vignobles de grandes surfaces ont des prix en moyenne moins élevés ("ce qui est rare est cher"). Par contre, la qualité physique des vignobles est non-significative dans le modèle des prix à un niveau.
+
 ## Modèle nul à 2 niveaux
 
 ```{r}
 mnnull <- lmer(LogPrix ~ 1 + (1 | LIBCOM), data=vignobles_final_cr, REML=F, na.action=na.omit)
 summary(mnnull)
+```
 
-# La variance résiduelle du niveau commune est de: 1.34
+```{r}
 vrn2 <- summary(mnnull)$varcor[1][[1]][[1]]
-# La variance résiduelle du niveau vignoble est de: 0.25
 vrn1 <- as.data.frame(summary(mnnull)$varcor)[2,]$vcov 
-# Donc la correlation intraclasse ICC est de 0.84
 icc <- vrn2 / (vrn1 + vrn2)
 icc
+```
 
-# Ou plus simplement
-performance::icc(mnnull)
+- La variance résiduelle du niveau commune est de vrn2 = `r round(vrn2,3)`.
+- La variance résiduelle du niveau commune est de vrn1 = `r round(vrn1,3)`.
+- Donc la correlation intraclasse ICC est de vrn2 / (vrn1 + vrn2) = `r round(icc,3)`.
 
+Ou plus simplement:
+```{r}
+performance::icc(mnnull)[[1]]
+```
+
+Dans ce modèle vide à 2 niveaux, `r round(icc*100,1)`% de la variance est prise en charge par l'appartenance au niveau 2.
+
+```{r}
+# Pour résumer:
 summary_stat["MNNull","N"] <- dim(mnnull@frame)[1] 
 summary_stat["MNNull","LogLik" ] <- summary(mnnull)$AIC[3][[1]] 
 summary_stat["MNNull", "AIC" ] <-summary(mnnull)$AIC[1][[1]]
@@ -300,7 +312,42 @@ summary_stat["MNNull", "InterClass" ] <- vrn1 / (vrn2 + vrn1)
 
 
 summary_stat
-
-
 ```
 
+### Analyser les résidus de niveau 2
+
+Extraction des résidus avec `ranef`, puis jointure et cartographie.
+```{r}
+ranef <- ranef(mnnull)$LIBCOM %>%
+  mutate(LIBCOM = as.character(rownames(.)),
+         residuCom = as.numeric(`(Intercept)`))
+
+mnnull_ranef <- left_join(communes_final, ranef, by=c("nom_comm"="LIBCOM"))
+
+ggplot(data = mnnull_ranef) +
+  geom_sf(aes(fill = residuCom), lwd=0.01, colour="white")  +
+  scale_fill_gradient2(low = "#00008B", mid = "white", high = "#800020") +
+  geom_text_repel(data = mnnull_ranef[abs(mnnull_ranef$residuCom) > 1,],
+                        aes(label = nom_comm, geometry = geometry),
+                  stat = "sf_coordinates",size=3, colour="black")
+```
+
+À Comparer avec la carte originale des prix moyens par commune
+= différence de centrage-réduction.
+
+```{r}
+ggplot(data = communes_final) +
+  geom_sf(aes(fill = Prix_moyen), lwd=0.01, colour="white")  +
+  scale_fill_gradient(low = "white", high="red") +
+  geom_text_repel(data = communes_final[communes_final$Prix_moyen > 500 ,],
+                        aes(label = nom_comm, geometry = geometry),
+                  stat = "sf_coordinates",size=3, colour="black")
+```
+
+
+## Modèle multiniveau avec variables de niveau 1 uniquement
+
+```{r}
+mnnull <- lmer(LogPrix ~ 1 + (1 | LIBCOM), data=vignobles_final_cr, REML=F, na.action=na.omit)
+summary(mnnull)
+```
