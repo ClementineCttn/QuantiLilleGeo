@@ -87,10 +87,9 @@
   
   
   ### Créer la variable regroupée de densité de la commune en 2 categories (1: communes densément peuplées & de densité intermédiaire	; 2: communes peu denses	& très peu denses)
-  pop_comm$densite_duo <- ifelse (pop_comm$densite == 1 , 1, 
-                                  ifelse (pop_comm$densite == 2 , 1,
-                                          ifelse (pop_comm$densite == 3 , 2,
-                                                  ifelse (pop_comm$densite == 4 , 2, NA))))
+  pop_comm$densite_duo <- ifelse (pop_comm$densite %in% 1:2 , 1, 
+                                  ifelse (pop_comm$densite %in% 3:4 , 2,
+                                          NA))
   
   pop_comm$densite_duo <- as.factor (pop_comm$densite_duo)
   
@@ -117,7 +116,11 @@
     ## Est-ce qu'il y a une différence  dans les taux de variation entre les départements   ?
     
     ### Tableau (cf Tableau 5c de la Fiche Insee)
-    pop_dep <- pop_comm %>% group_by(DEP) %>% summarise(P17_POP = sum (P17_POP), P07_POP = sum (P07_POP) )
+    pop_dep <- pop_comm %>% 
+        group_by(DEP) %>% 
+        summarise(P17_POP = sum (P17_POP), 
+                  P07_POP = sum (P07_POP) )
+  
     pop_dep$txvar <- ((pop_dep$P17_POP / pop_dep$P07_POP)^0.1 - 1)*100
     
     pop_dep$txvar <- round (pop_dep$txvar, digits = 2)
