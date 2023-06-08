@@ -48,15 +48,13 @@
   sum (pop_comm$P17_POP, na.rm=TRUE)
 
   ## Faire un histogramme par commune
-  hist(pop_comm$txvar,
-     breaks = 100,
-     xlab = "Taux de croissance par commune",
-     ylab = "Frequence",
-     main = "Histogramme des taux de variation annuel de la population 2007-2017 des communes françaises",
-     col = "black",
-     border = "white")
-  
+ 
   ggplot(pop_comm) +
+    geom_histogram(aes(x = txvar), bins = 100, fill = "salmon") +
+    labs(title = "Histogramme des taux de variation annuelle 
+    de la population 2007-2017 des communes françaises",
+        x = "Taux de croissance par commune",
+        y = "Frequence")
     
 
   ## Créer la variable "Population 2007 par commune" - à partir de tx var et POP 2017
