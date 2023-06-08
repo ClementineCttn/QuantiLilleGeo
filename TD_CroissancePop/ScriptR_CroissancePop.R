@@ -178,7 +178,10 @@
   ## Est-ce le taux de variation des communes est associé à leur densité ?
     
     ### Tableau (cf Tableau 1a de la Fiche Insee)
-    pop_grilleDensite <- pop_comm %>% group_by(densite) %>% summarise(P17_POP = sum (P17_POP), P07_POP = sum (P07_POP) )
+    pop_grilleDensite <- pop_comm %>% 
+      group_by(densite) %>% 
+      summarise(P17_POP = sum (P17_POP), P07_POP = sum (P07_POP) )
+    
     pop_grilleDensite$txvar <- ((pop_grilleDensite$P17_POP / pop_grilleDensite$P07_POP)^0.1 - 1)*100
     
     pop_grilleDensite$txvar <- round (pop_grilleDensite$txvar, digits = 2 )
@@ -234,7 +237,9 @@
   ## Est-ce le taux de variation des communes varie aussi selon la présence d'une grande ville dans le département ?
   
     ### Créer variable au niveau du département : présence/absence d'une commune > 150 000 hb.
-    maxpop_dep <- pop_comm %>% group_by(DEP) %>% summarise(max_P17_POP = max (P17_POP))
+    maxpop_dep <- pop_comm %>% 
+      group_by(DEP) %>% 
+      summarise(max_P17_POP = max (P17_POP))
     maxpop_dep$gdcommuneInDep <- ifelse (maxpop_dep$max_P17_POP > 150000, 1, 0)
     maxpop_dep$gdcommuneInDep <- as.factor (maxpop_dep$gdcommuneInDep)
     pop_comm <- pop_comm %>%
