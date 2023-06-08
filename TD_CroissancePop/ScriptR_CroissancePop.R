@@ -21,7 +21,7 @@
   library(sf)
 
   ## Créer un dossier "Data" et définir le working directory
-  setwd("~/Cours/2023_QuantiLille_Multiniveaux/QuantiLilleGeo/TD_CroissancePop/Data")
+  setwd("/Users/ccottineau/Documents/GitHub/QuantiLilleGeo/TD_CroissancePop/Data")
   
 # 2.Les données issues de la fiche Insee----
   
@@ -34,23 +34,15 @@
   ## Importer les données dans R
   ## Note : grille communale de densité (1: commune densément peuplée	;	2: commune de densité intermédiaire	; 3: commune peu dense	; 4: commune très peu dense)
   
-  pop_comm <- read_excel("if177.xlsx", 
+  pop_com_raw <- read_excel("if177.xlsx", 
                          sheet = "Figure complémentaire 1", col_names = FALSE, 
                          skip = 3)
-  names (pop_comm)
-  pop_comm <- rename(pop_comm, REG="...1")
-  pop_comm <- rename(pop_comm, DEP="...2")
-  pop_comm <- rename(pop_comm, CODGEO="...3")
-  pop_comm <- rename(pop_comm, Commune="...4")
-  pop_comm <- rename(pop_comm, densite="...5" )
-  pop_comm <- rename(pop_comm, P17_POP="...6" )
-  pop_comm <- rename(pop_comm, txvar="...7" )
-
-  pop_comm <- pop_comm %>% filter(!is.na(CODGEO))
-  pop_comm <- pop_comm %>% filter(!is.na(txvar))
-  pop_comm$densite <- substr (pop_comm$densite, start =1 , stop =1)
-  pop_comm$densite <- as.factor (pop_comm$densite)
-  pop_comm <- pop_comm %>% select (REG, DEP, CODGEO, Commune, densite, P17_POP, txvar)
+  colnames(pop_com_raw) <- c("REG", "DEP", "CODGEO", "Commune", "DensiteChar", "P17_POP", "txvar", "VAR1", "VAR2", "VAR3")
+  
+  pop_comm <- pop_com_raw %>% 
+    filter(!is.na(CODGEO) | !is.na(txvar)) %>%
+    mutate(densite = as.factor(substr(DensiteChar, start =1 , stop =1))) %>% 
+    select (REG, DEP, CODGEO, Commune, densite, P17_POP, txvar)
 
   ## Valider les chiffres population totale en 2017 /note Insee (66 524 339) => OK
   sum (pop_comm$P17_POP, na.rm=TRUE)
@@ -63,6 +55,9 @@
      main = "Histogramme des taux de variation annuel de la population 2007-2017 des communes françaises",
      col = "black",
      border = "white")
+  
+  ggplot(pop_comm) +
+    
 
   ## Créer la variable "Population 2007 par commune" - à partir de tx var et POP 2017
   ## txvar <- ((pop2017 / pop2007)^(1/n) - 1)*100  (avec n=10 car 10 ans entre les deux valeurs)
