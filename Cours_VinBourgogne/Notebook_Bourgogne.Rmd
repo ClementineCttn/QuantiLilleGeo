@@ -28,10 +28,12 @@ library(ggrepel) # pour des étiquettes de graphiques propres
 
 Il s'agit des vignobles de Bourgogne. On a dans un tableau les caractéristiques de 2391 vignobles en termes de:
 
-- prix moyen du vin
+- prix moyen du vin (millésimes 1998, 2002 et 2003)
 - qualité pédologique et météo (radiations solaires, pluie, etc.)
 - appellation d'origine contrôlée en 5 niveaux (Côteaux bourgignons <  Bourgogne < Village < Premier cru < Grand cru.)
 - surface
+
+Sources: *Ay J.S., Hilal M., 2020, « Les déterminants naturels et politiques des AOC viticoles de Côte-d’Or », Cybergeo: European Journal of Geography, document 973, DOI : https://doi.org/10.4000/cybergeo.36443* et *https://www.hachette-vins.com/guide-vins/actualite-vin/487/les-meilleurs-millesimes-des-vins-de-france/*
 
 
 ```{r}
@@ -55,6 +57,7 @@ Il s'agit des communes de Côte d'Or. On a dans un tableau les caractéristiques
 - côte d'appellation
 - hierarchie administrative
 
+Source: *https://geo.data.gouv.fr/en/datasets/cac9f2c0de2d3a0209af2080854b6f6a7ee3d9f4*
 
 ```{r}
 communes <- st_read("Data/Geo/communes.shp",
