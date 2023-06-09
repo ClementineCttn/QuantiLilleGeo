@@ -432,6 +432,7 @@ summary(mn2)
 - L'ajout des variables de niveaux 1 et 2 a permis de réduire la variance totale de `r round(100*((1 - (summary(mn2)$varcor[1][[1]][[1]] + as.data.frame(summary(mn2)$varcor)[2,]$vcov) / (vrn2 + vrn1) )),1)`%.
 - La variance interclasse est maintenant de `r 100-round(performance::icc(mn2)[[1]]*100,1)`%.
 
+
 ```{r}
 summary_stat["MNVar2Niv","N"] <- dim(mn2@frame)[1] 
 summary_stat["MNVar2Niv","LogLik" ] <- summary(mn2)$AIC[3][[1]] 
@@ -481,5 +482,81 @@ ggplot(data = mn2_ranef) +
                         aes(label = nom_comm, geometry = geometry),
                   stat = "sf_coordinates",size=3, colour="black")
 ```
+
+
+
+## Modèle multiniveau avec variables de niveau 1 et 2, et pentes aléatoires
+
+### Visualisation des variations par commune
+
+```{r}
+
+ggplot(data = vignobles_final_cr, 
+       aes(x   = Quality,
+           y   = LogPrix, 
+           col = LIBCOM))+
+  geom_point(size     = 1, 
+             alpha    = .7, 
+             position = "jitter")+
+  geom_smooth(method   = lm,
+              se       = T, 
+              size     = 1.5, 
+              linetype = 1, 
+              alpha    = .2) +
+  labs(title = "Relation entre qualité et prix selon l'appartenance communale") +
+  theme(legend.position="right")
+
+
+```
+
+### Modélisation des pentes aléatoire
+
+```{r}
+mn3 <- lmer(LogPrix ~ Quality + Surface + Source + AOC +
+               MeanQuality + ShareGdCru + Cote +
+              (Quality | LIBCOM), data=vignobles_final_cr, REML=F, na.action=na.omit)
+summary(mn3)
+```
+
+- La relation entre prix et surface, prix et AOC "Grand Cru", prix et Côte de Nuits est toujours positive.
+- La relation entre prix et qualité est toujours négative.
+- L'ajout des pentes aléatoires a permis de réduire la variance totale de `r round(100*((1 - (summary(mn3)$varcor[1][[1]][[1]] + as.data.frame(summary(mn3)$varcor)[2,]$vcov) / (vrn2 + vrn1) )),1)`%.
+- La variance interclasse est maintenant de `r 100-round(performance::icc(mn3)[[1]]*100,1)`%.
+
+### Evaluation du modèle
+
+```{r}
+summary_stat["MNVar3Niv","N"] <- dim(mn3@frame)[1] 
+summary_stat["MNVar3Niv","LogLik" ] <- summary(mn3)$AIC[3][[1]] 
+summary_stat["MNVar3Niv", "AIC" ] <-summary(mn3)$AIC[1][[1]]
+summary_stat["MNVar3Niv", "BIC" ] <- summary(mn3)$AIC[2][[1]]
+summary_stat["MNVar3Niv", "Deviance" ] <- summary(mn3)$AIC[4][[1]]
+summary_stat["MNVar3Niv", "Total_Var" ] <-
+  summary(mn3)$varcor[1][[1]][[1]] + as.data.frame(summary(mn3)$varcor)[2,]$vcov 
+summary_stat["MNVar3Niv", "ICC" ] <- performance::icc(mn3)[[1]]
+summary_stat["MNVar3Niv", "InterClass" ] <- 1 -  performance::icc(mn3)[[1]]
+summary_stat["MNVar3Niv", "PseudoR2" ] <- 
+  (1 - (summary_stat["MNVar3Niv", "Total_Var" ]  / summary_stat["MNNull", "Total_Var" ] )) 
+summary_stat
+```
+
+### Cartographie des valeurs de pentes par commune:
+
+```{r}
+ranef <- ranef(mn3)$LIBCOM %>%
+  mutate(LIBCOM = as.character(rownames(.)),
+         penteQuality = as.numeric(`Quality`))
+
+mn3_ranef <- left_join(communes_final, ranef, by=c("nom_comm"="LIBCOM"))
+
+ggplot(data = mn3_ranef) +
+  geom_sf(aes(fill = penteQuality, colour = Cote))  +
+  scale_fill_gradient2(low = "#00008B", mid = "white", high = "#800020") +
+  geom_text_repel(data = mn3_ranef[abs(mn3_ranef$penteQuality) > 0.25,],
+                        aes(label = nom_comm, geometry = geometry),
+                  stat = "sf_coordinates",size=3, colour="black")
+```
+
+Résultats différents entre **Côte de Beaune** (et en particulier Pommard) où les vignobles de grande qualité physique sont globalement associés à des prix **plus élevés** et **Côte de Nuits** et **Côte d'Or** (et en particulier Nuits-St-Georges) où les vignobles de grande qualité physique sont globalement associés à des prix **moins élevés**...
 
 
