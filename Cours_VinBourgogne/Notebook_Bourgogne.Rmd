@@ -71,7 +71,8 @@ Avec `ggplot`, utilisation de `geom_sf` pour les objets spatiaux.
 ```{r}
 ggplot(data = vignobles) +
   geom_sf(aes(fill = log(PrixMoy)), lwd=0.01, colour="white")  +
-  scale_fill_viridis_c(option = "viridis")
+  scale_fill_viridis_c(option = "viridis")+
+  labs(title = "Niveaux de qualité physique des vignobles") 
 ```
 
 Pour des étiquettes réactives, on utilise `geom_text_repel`:
@@ -81,7 +82,8 @@ ggplot(data = communes) +
   geom_sf(aes(fill = Cote), lwd=0.01, colour="white") +
   geom_text_repel(data = communes[communes$population > 1,],
                         aes(label = nom_comm, geometry = geometry),
-                  stat = "sf_coordinates",size=3, colour="black")
+                  stat = "sf_coordinates",size=3, colour="black")+
+  labs(title = "Appartenance communale aux côtes bourguignonnes") 
 
 ```
 
@@ -138,7 +140,8 @@ ggplot(data = communes_final) +
   scale_fill_gradient(low = "white", high="red") +
   geom_text_repel(data = communes_final[communes_final$Prix_moyen > 100 ,],
                   aes(label = nom_comm, geometry = geometry),
-                  stat = "sf_coordinates",size=3, colour="black")
+                  stat = "sf_coordinates",size=3, colour="black")+
+  labs(title = "Prix moyen par commune") 
 
 
 
@@ -149,7 +152,8 @@ ggplot(data = communes_final) +
   geom_text_repel(data = communes_final[communes_final$MoyPond_b > 80
                                       | communes_final$MoyPond_b < 65 ,], 
                   aes(label = nom_comm, geometry = geometry),
-                  stat = "sf_coordinates",size=3, colour="black")
+                  stat = "sf_coordinates",size=3, colour="black")+
+  labs(title = "Qualités moyennes des vignobles par commune") 
 
 # Proportion de parcelles en grand cru par commune
 ggplot(data = communes_final) +
@@ -157,7 +161,8 @@ ggplot(data = communes_final) +
   scale_fill_gradient(low = "white", high="goldenrod") +
   geom_text_repel(data = communes_final[communes_final$share_GdCru > 8 ,],
                   aes(label = nom_comm, geometry = geometry),
-                  stat = "sf_coordinates",size=3, colour="black")
+                  stat = "sf_coordinates",size=3, colour="black")+
+  labs(title = "Part de grands crus par commune") 
 
 
 # Proportion de parcelles en premier ou grand cru par commune
@@ -166,7 +171,8 @@ ggplot(data = communes_final) +
   scale_fill_gradient(low = "white", high="gold") +
   geom_text_repel(data = communes_final[communes_final$share_PmGrCru > 30 ,],
                   aes(label = nom_comm, geometry = geometry),
-                  stat = "sf_coordinates",size=3, colour="black")
+                  stat = "sf_coordinates",size=3, colour="black")+
+  labs(title = "Part de premiers et grands crus par commune") 
 
 ```
 
@@ -191,7 +197,8 @@ summary(vignobles_final)
 summary(vignobles_final$PrixMoy)
 
 ggplot(data=vignobles_final, aes(x=PrixMoy)) +
-  geom_histogram(fill="coral1")
+  geom_histogram(fill="coral1")+
+  labs(title = "Distribution des prix du vin") 
 
 # Passage en log pour une distribution plus normale
 vignobles_final$LogPrix <- log(vignobles_final$PrixMoy)
@@ -199,7 +206,8 @@ vignobles_final$LogPrix <- log(vignobles_final$PrixMoy)
 ggplot(data=vignobles_final, aes(x=LogPrix)) +
   geom_histogram(fill="coral3") +
   geom_vline(aes(xintercept=mean(LogPrix)),   
-             color="black", linetype="dashed", size=1)
+             color="black", linetype="dashed", size=1)+
+  labs(title = "Distribution des log de prix moyens") 
 
 
 ```
@@ -208,22 +216,26 @@ ggplot(data=vignobles_final, aes(x=LogPrix)) +
 ```{r}
 #Score qualité geographique (pente, geologie, pedologie, precipitations):
 ggplot(data=vignobles_final, aes(x=SCORE_b)) +
-  geom_histogram(fill="brown1")
+  geom_histogram(fill="brown1")+
+  labs(title = "Distribution des niveaux de qualité") 
 
 #Surface:
 ggplot(data=vignobles_final, aes(x=SURFACE)) +
-  geom_histogram(fill="brown2")
+  geom_histogram(fill="brown2")+
+  labs(title = "Distribution des surfaces de vignoble") 
 
 #Niveau d'aoc:
 positions <- c("Coteaux b.", "Bourgogne", "Village",
                "Premier cru", "Grand cru")
 ggplot(data=vignobles_final, aes(x=NIVEAU)) +
   geom_bar(fill="brown3") +
-  scale_x_discrete(limits = positions)
+  scale_x_discrete(limits = positions)+
+  labs(title = "Distribution des niveaux d'AOC") 
 
 #Source info prix:
 ggplot(data=vignobles_final, aes(x=Source)) +
-   geom_bar(fill="brown4") 
+   geom_bar(fill="brown4") +
+  labs(title = "Distribution des sources de données par vignoble") 
 ```
 
 ## variables explicatives niveau 2:
@@ -231,21 +243,25 @@ ggplot(data=vignobles_final, aes(x=Source)) +
 
 #Population de la commune
 ggplot(data=communes_final, aes(x=population)) +
-  geom_histogram(fill="aquamarine1", bins = 5)
+  geom_histogram(fill="aquamarine1", bins = 5)+
+  labs(title = "Distribution des populations par commune") 
 
 #Part de grand et premier cru de la commune
 ggplot(data=communes_final, aes(x=share_PmGrCru)) +
-  geom_histogram(fill="aquamarine3", bins = 5)
+  geom_histogram(fill="aquamarine3", bins = 5)+
+  labs(title = "Distribution des distribution de premier et grand crus par commune") 
 
 #Cote de nuit ou cote de beaune:
 pos_cote <- c("Côte de Nuit", "Côte de Beane", "Côte D'or")
 ggplot(data=communes_final, aes(x=Cote)) +
   geom_bar(fill="aquamarine4") +
-  scale_x_discrete(limits = pos_cote)
+  scale_x_discrete(limits = pos_cote)+
+  labs(title = "Distribution des communes par côte") 
 
 #Qualite moyenne de la commune
 ggplot(data=communes_final, aes(x=MoyPond_b)) +
-  geom_histogram(fill="darkslategrey", bins = 5)
+  geom_histogram(fill="darkslategrey", bins = 5) +
+  labs(title = "Distribution des qualités moyennes") 
 
 ```
 
@@ -334,6 +350,7 @@ mnnull_ranef <- left_join(communes_final, ranef, by=c("nom_comm"="LIBCOM"))
 ggplot(data = mnnull_ranef) +
   geom_sf(aes(fill = residuCom), lwd=0.01, colour="white")  +
   scale_fill_gradient2(low = "#00008B", mid = "white", high = "#800020") +
+  labs(title = "Résidus de niveau 2") +
   geom_text_repel(data = mnnull_ranef[abs(mnnull_ranef$residuCom) > 1,],
                         aes(label = nom_comm, geometry = geometry),
                   stat = "sf_coordinates",size=3, colour="black")
@@ -346,6 +363,7 @@ ggplot(data = mnnull_ranef) +
 ggplot(data = communes_final) +
   geom_sf(aes(fill = Prix_moyen), lwd=0.01, colour="white")  +
   scale_fill_gradient(low = "white", high="red") +
+  labs(title = "Prix moyen du vin par commune") +
   geom_text_repel(data = communes_final[communes_final$Prix_moyen > 500 ,],
                         aes(label = nom_comm, geometry = geometry),
                   stat = "sf_coordinates",size=3, colour="black")
@@ -391,7 +409,8 @@ summary(mn1_residuals$residusN1)
 
 ggplot(data = mn1_residuals) +
   geom_sf(aes(fill = residusN1), lwd=0.01, colour="white")  +
-  scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkorange") + 
+  scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkorange") +
+  labs(title = "Résidus de niveau 1") + 
   theme_minimal() 
 
 ```
@@ -409,6 +428,7 @@ mn1_ranef <- left_join(communes_final, ranef, by=c("nom_comm"="LIBCOM"))
 ggplot(data = mn1_ranef) +
   geom_sf(aes(fill = residuCom), lwd=0.01, colour="white")  +
   scale_fill_gradient2(low = "#00008B", mid = "white", high = "#800020") +
+  labs(title = "Résidus de niveau 2") +
   geom_text_repel(data = mn1_ranef[abs(mn1_ranef$residuCom) > 1,],
                         aes(label = nom_comm, geometry = geometry),
                   stat = "sf_coordinates",size=3, colour="black")
@@ -459,7 +479,8 @@ colnames(mn2_residuals)[length(colnames(vignobles_final_cr))] <- "residusN1"
 
 ggplot(data = mn2_residuals) +
   geom_sf(aes(fill = residusN1), lwd=0.01, colour="white")  +
-  scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkorange") + 
+  scale_fill_gradient2(low = "darkgreen", mid = "white", high = "darkorange")+
+  labs(title = "Résidus de niveau 1")  + 
   theme_minimal() 
 
 ```
@@ -480,7 +501,8 @@ ggplot(data = mn2_ranef) +
   scale_fill_gradient2(low = "#00008B", mid = "white", high = "#800020") +
   geom_text_repel(data = mn2_ranef[abs(mn2_ranef$residuCom) > 1,],
                         aes(label = nom_comm, geometry = geometry),
-                  stat = "sf_coordinates",size=3, colour="black")
+                  stat = "sf_coordinates",size=3, colour="black")+
+  labs(title = "Résidus de niveau 2") 
 ```
 
 
