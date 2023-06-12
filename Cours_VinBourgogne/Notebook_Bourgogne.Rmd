@@ -252,7 +252,7 @@ ggplot(data=communes_final, aes(x=population)) +
 #Part de grand et premier cru de la commune
 ggplot(data=communes_final, aes(x=share_PmGrCru)) +
   geom_histogram(fill="aquamarine3", bins = 5)+
-  labs(title = "Distribution des distribution de premier et grand crus par commune") 
+  labs(title = "Distribution des AOC premier et grand crus par commune") 
 
 #Cote de nuit ou cote de beaune:
 pos_cote <- c("Côte de Nuit", "Côte de Beane", "Côte D'or")
@@ -305,6 +305,8 @@ summary(L1)
 ```{r}
 mnnull <- lmer(LogPrix ~ 1 + (1 | LIBCOM), data=vignobles_final_cr, REML=F, na.action=na.omit)
 summary(mnnull)
+
+print(ranova(mnnull))
 ```
 
 ```{r}
@@ -579,7 +581,8 @@ ggplot(data = mn3_ranef) +
   scale_fill_gradient2(low = "#00008B", mid = "white", high = "#800020") +
   geom_text_repel(data = mn3_ranef[abs(mn3_ranef$penteQuality) > 0.25,],
                         aes(label = nom_comm, geometry = geometry),
-                  stat = "sf_coordinates",size=3, colour="black")
+                  stat = "sf_coordinates",size=3, colour="black") +
+  labs(title = "Distribution des effets aléatoires de la variable Quality selon les communes")
 ```
 
 Résultats différents entre **Côte de Beaune** (et en particulier Pommard) où les vignobles de grande qualité physique sont globalement associés à des prix **plus élevés** et **Côte de Nuits** et **Côte d'Or** (et en particulier Nuits-St-Georges) où les vignobles de grande qualité physique sont globalement associés à des prix **moins élevés**...
