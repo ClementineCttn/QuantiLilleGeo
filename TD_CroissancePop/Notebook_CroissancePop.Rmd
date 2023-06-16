@@ -1,0 +1,540 @@
+---
+title: "R Notebook Quantilille 2023"
+author: "Clémentine Cottineau & Julie Vallée"
+date: "30-06-2023"
+output:
+  html_document:
+    df_print: paged
+subtitle: "Module multiniveaux - Aspects géographiques - La croissance démographique des communes françaises"
+---
+
+# Mise en place
+
+## Charger des packages
+```{r, message=FALSE}
+library(lme4) # pour la modélisation multiniveau
+library(lmerTest) # pour l'évaluation des modèles
+library(sf) # pour les objets spatiaux (cartes)
+library(tidyverse) # pour la manipulation des données
+library(readxl) # pour ouvrir les fichiers xlsx
+library(languageR)
+library (dplyr)
+```
+
+## Créer un dossier "Data" et définir le working directory
+setwd("~/Cours/2023_QuantiLille_Multiniveaux/QuantiLilleGeo/TD_CroissancePop/Data")
+
+## Charger les données issues de la fiche Insee
+Fiche INSEE : <https://www.insee.fr/fr/statistiques/4267787>
+
+### Télecharger les données et les mettre dans un dossier "Data"
+
+URL des données de la fiche INSEE :
+<https://www.insee.fr/fr/statistiques/fichier/4267787/if177.xlsx> 
+
+Note : grille communale de densité (1: commune densément peuplée ; 2: commune de densité intermédiaire ; 3: commune peu dense ; 4: commune très peu dense)
+```{r, message=FALSE}
+  pop_com_raw <- read_excel("Data/if177.xlsx",
+                         sheet = "Figure complémentaire 1", col_names = FALSE, 
+                         skip = 3)
+
+  colnames(pop_com_raw) <- c("REG", "DEP", "CODGEO", "Commune", "DensiteChar", "P17_POP", "txvar", "VAR1", "VAR2", "VAR3")
+  
+  
+  pop_comm <- pop_com_raw %>% 
+    filter(!is.na(CODGEO) | !is.na(txvar)) %>%
+    mutate(densite = as.factor(substr(DensiteChar, start =1 , stop =1))) %>% 
+    select (REG, DEP, CODGEO, Commune, densite, P17_POP, txvar)
+  
+```
+
+
+### Explorer la variable txvar (taux de variation annuelle de la population des communes entre 2007-2017)
+
+Observer la distribution de la variable txvar
+```{r}
+ summary(pop_comm$txvar)
+```
+
+Supprimer les communes avec txvar = NA
+```{r}
+ pop_comm <- pop_comm %>% drop_na(txvar)
+```
+
+Faire un histogramme par commune
+```{r}
+  ggplot(pop_comm) +
+    geom_histogram(aes(x = txvar), bins = 100, fill = "salmon") +
+    labs(title = "Histogramme des taux de variation annuelle 
+    de la population 2007-2017 des communes françaises",
+        x = "Taux de croissance par commune",
+        y = "Frequence")
+```
+
+
+Valider les chiffres population totale en 2017 /note Insee (66 524 339)
+```{r}
+  sum (pop_comm$P17_POP)
+
+```
+
+### Enrichir les données
+Créer la variable "Population 2007 par commune" - à partir de tx var et POP 2017
+
+Quelle formule ?
+
+txvar <- ((pop2017 / pop2007)^(1/n) - 1)*100 (avec n=10 car 10 ans entre les deux valeurs)
+txvar <- (pop2017 / pop2007)^0.1 - 1)*100)
+=> tvar/100 +1 = pop2017/pop2007)^0.1
+=> (tvar/100 + 1)^10 =pop2017/pop2007
+=> pop2007 = pop2017 / (tvar/100 + 1 )^10
+
+```{r}
+  pop_comm$P07_POP <-pop_comm$P17_POP / (((pop_comm$txvar/100) + 1)^10)
+  pop_comm$P07_POP <- round(pop_comm$P07_POP, digits =0)
+```
+
+Note : On pourrait aussi vérifier avec les données de population 2007 importées d'une autre source
+URL : https://www.insee.fr/fr/statistiques/fichier/4515565/base-ccx-evol-struct-pop-2017.zip
+pop_comm_2007 <- read_excel("base-cc-evol-struct-pop-2017.xlsx", sheet = "COM_2007", skip = 5)
+pop_comm_2007 <- pop_comm_2007 %>% select (CODGEO, REG, DEP, LIBGEO, P07_POP)
+pop_comm_2007$P07_POP <- round(pop_comm_2007$P07_POP, digits =0)
+
+
+## Charger les données géographiques des départements
+
+URL : https://geoservices.ign.fr/adminexpress
+
+Choisir dossier "ADMIN-EXPRESS-COG-CARTO" édition 2021 par territoire France Métropolitaine
+
+URL = https://wxs.ign.fr/x02uy2aiwjo9bm8ce5plwqmr/telechargement/prepackage/ADMINEXPRESS-COG-CARTO_SHP_TERRITOIRES_PACK_2021-05-19$ADMIN-EXPRESS-COG-CARTO_3-0__SHP_LAMB93_FXX_2021-05-19/file/ADMIN-EXPRESS-COG-CARTO_3-0__SHP_LAMB93_FXX_2021-05-19.7z>
+
+Dézipper le dossier
+
+Importer la couche des départements dans R
+```{r}
+  dep_fr <- st_read('Data/ADMIN-EXPRESS-COG-CARTO_3-0__SHP_LAMB93_FXX_2021-05-19/ADMIN-EXPRESS-COG-CARTO/1_DONNEES_LIVRAISON_2021-05-19/ADECOGC_3-0_SHP_LAMB93_FXX/DEPARTEMENT.shp', 
+                      quiet = TRUE)
+```
+
+Faire une carte "vide" des départements
+```{r}
+  ggplot(data = dep_fr) +
+    geom_sf() + 
+    ggtitle("Les départements français")
+```
+
+
+# Analyses
+
+## Question A - Visualiser les différences des taux de variation selon les départements
+
+### Faire un tableau pour comparer les taux de variation des communes entre les départements 
+cf.Tableau 5c de la Fiche Insee
+```{r}
+    pop_dep <- pop_comm %>% 
+        group_by(DEP) %>% 
+        summarise(P17_POP = sum (P17_POP), 
+                  P07_POP = sum (P07_POP),)
+  
+    pop_dep$txvar <- ((pop_dep$P17_POP / pop_dep$P07_POP)^0.1 - 1)*100
+    
+    pop_dep$txvar <- round (pop_dep$txvar, digits = 2)
+    print (pop_dep)
+```
+
+### Faire une carte pour comparer les taux de variation des communes entre les départements 
+cf.Carte 5c de la Fiche Insee
+```{r}
+    dep_fr$DEP <- dep_fr$INSEE_DEP
+    dep_fr <- dep_fr %>% 
+      left_join(pop_dep, by = "DEP")
+    
+    ggplot(data = dep_fr) +
+      geom_sf(aes(fill = txvar)) + 
+      scale_fill_viridis_c(option = "viridis")+
+      ggtitle("Taux de variation annuel de la population 
+      par département entre 2007 et 2017")
+    
+```
+
+Refaire la carte avec les 5 mêmes classes que dans la fiche Insee
+(< -0,1 ; [-0,1 ; 0,1[ ;  [0,1 ; 0,5[ ; [0,5 ; 1[ ; >=1) 
+```{r}
+    ggplot(data = dep_fr) +
+      geom_sf(aes(fill = txvar)) + 
+      ggtitle("Taux de variation annuel de la population 
+              par département entre 2007 et 2017") +
+      scale_fill_stepsn(
+                  colors = c("#a6cee3", "#ffffc0", "#fc8d59", "#e34a33", "#b30000"),
+                  breaks = c(-0.1, 0.1, 0.5, 1.0, 2.0))
+
+```
+
+### Faire un modèle multiniveau (vide) pour comparer les taux de variation des communes entre les départements 
+
+Modèle nul/vide (ie. sans variables explicatives) - modèle avec intercept aléatoire
+avec la commune en niveau 1 et le département en niveau 2
+```{r}
+    mod_0<-lmer (txvar ~ 1 + (1 | DEP),data=pop_comm, REML = FALSE)
+    summary(mod_0)
+```
+
+Stocker les infos du modèle vide dans un tableau
+```{r}
+# Modéle Nul
+summary_stat <- data.frame()
+summary_stat["mod_0","N"] <- dim(mod_0@frame)[1] 
+summary_stat["mod_0", "AIC" ] <-summary(mod_0)$AIC[1][[1]]
+summary_stat["mod_0", "BIC" ] <- summary(mod_0)$AIC[2][[1]]
+summary_stat["mod_0", "vrn1" ] <- as.data.frame(summary(mod_0)$varcor)[2,]$vcov 
+summary_stat["mod_0", "vrn2" ] <- summary(mod_0)$varcor[1][[1]][[1]]
+
+summary_stat["mod_0", "Total_Var" ] <- summary_stat$vrn2[1] + summary_stat$vrn1[1]
+summary_stat["mod_0", "ICC" ] <- summary_stat$vrn2[1] / summary_stat$Total_Var[1]
+summary_stat["mod_0", "InterClass" ] <- summary_stat$vrn1[1] / summary_stat$Total_Var[1]
+
+summary_stat
+```
+
+=> On peut en conclure que 10% de la variance du modèle vide concerne le niveau 2 (département)
+
+
+
+Explorer les résultats du Modèle vide : Cartographier les **résidus** de niveau 2 (par département)
+
+Extraction des résidus de niveau 2
+```{r}
+    mod_0_residDep<-ranef(mod_0) 
+    mod_0_residDep <- as.data.frame(mod_0_residDep$DEP)
+```
+
+
+Création d'une colonne pour l'identifiant département et renommer la variable
+```{r}
+    mod_0_residDep$DEP <-row.names(mod_0_residDep)
+    
+    mod_0_residDep <- mod_0_residDep %>% 
+      rename(residDep_mod_0 = '(Intercept)')
+```
+
+Jointure entre le tableau de résidus et la couche des départements
+```{r}
+    dep_fr <- dep_fr %>% 
+      left_join(mod_0_residDep, by = "DEP")
+```
+
+
+Cartographie des résidus au niveau des départements pour le modèle vide
+```{r}
+     ggplot(data = dep_fr) +
+      geom_sf(aes(fill = residDep_mod_0))  +
+      scale_fill_viridis_c(option = "viridis")+
+      ggtitle("Distribution des résidus de niveau 2 (département) 
+              - Modèle vide")
+```
+
+=> Pusiqu'il s'agit d'une carte des residus de niveau 2 (departement) pour le modèle vide, cela signifie que :
+- les departements avec des résidus élévés sont ceux où le taux de variation est élévé
+- les départements avec des résidus faibles sont ceux où le taux de variation est faible
+Carte très similaire à celle des taux de variations par départements (différence de centrage-réduction).
+
+
+## Question B - Est-ce que le taux de variation des communes est associé à leur densité ?
+
+### Faire un tableau pour comparer les taux de variation des communes selon le niveau de densité des communes
+cf Figure 2
+```{r}
+    pop_grilleDensite <- pop_comm %>% 
+      group_by(densite) %>% 
+      summarise(P17_POP = sum (P17_POP), 
+                P07_POP = sum (P07_POP))
+
+    pop_grilleDensite$txvar <- ((pop_grilleDensite$P17_POP / pop_grilleDensite$P07_POP)^0.1 - 1)*100
+
+    pop_grilleDensite$txvar <- round (pop_grilleDensite$txvar, digits = 2 )
+    
+    print(pop_grilleDensite)
+```
+### Faire un modèle multiniveau pour mesurer la relation avec le niveau de densité des communes
+Modèle 1full, avec la variable "densité en 4 categories" comme variable explicative au niveau des communes (effet fixe)
+```{r}
+    mod_1full<-lmer (txvar ~ 1 + densite + (1 | DEP),data=pop_comm, REML = FALSE)
+    summary(mod_1full)
+```
+
+=> Le taux de variation des communes est associé à leur niveau de densité de façon statistiquement significative. Comparées aux communes de densité 1 (denses) : les communes de densité 2 (intermédiaires) ont un taux de variation plus élevé (+ 0.158%), les communes de densité 3 (peu denses) ont un taux de variation encore plus élevé (+ 0.219%) et les communes de densité 4 (tres peu denses) ont un taux de variation plus faible (- 0.146%).
+
+
+## Question C - Si on classe les communes en deux catégroies selon leur densité, quelle classification est la plus pertinente à intégrer au modèle multiniveau ?
+
+### Si on fait comme dans la fiche Insee ?
+1: communes densément peuplées & de densité intermédiaire
+2: communes peu denses & très peu denses
+```{r}
+  pop_comm$densite_duo <- ifelse (pop_comm$densite %in% 1:2 , 1, 
+                                  ifelse (pop_comm$densite %in% 3:4 , 2,
+                                          NA))
+  
+  pop_comm$densite_duo <- as.factor (pop_comm$densite_duo)
+
+```
+
+Modèle 1_duo, avec la variable "densité" (selon les 2 categories Insee) comme variable explicative au niveau des communes (effet fixe)
+```{r}
+    mod_1_duo<-lmer (txvar ~ 1 + densite_duo + (1 | DEP),data=pop_comm, REML = FALSE)
+    summary(mod_1_duo)
+```
+
+### Si on isole les communes peu denses ?
+0: communes densément peuplées & de densité intermédiaire & très peu denses
+1: communes peu denses)
+```{r}
+  pop_comm$peudenses <- ifelse (pop_comm$densite %in% 3 , 1,
+                                          0)
+  pop_comm$peudenses <- as.factor (pop_comm$peudenses)
+
+```
+
+Modèle 1, avec la variable "peudenses : Oui/Non" comme variable explicative au niveau des communes (effet fixe)
+```{r}
+    mod_1<-lmer (txvar ~ 1 + peudenses + (1 | DEP),data=pop_comm, REML = FALSE)
+    summary(mod_1)
+```
+
+=> Si on regroupe les communes en deux catégories (denses & intermédiaires d'un côté; et peu denses et très peu denses de l'autre), le taux de variation des communes n'apparait plus  associé au niveau de densité de façon statistiquement significative. 
+
+=> Si on isole les communes peu denses (celles pour lesquelles les taux de variation était le plus fort), le taux de variation des communes apparait associé au niveau de densité de façon statistiquement significative. Comparées aux autres communes, les communes peu denses ont un taux plus élevé de variation annuelle de leur population (+ 0.284%)
+
+
+Cartographie par département des coefficients liés à la densité (effet fixe) pour le modèle 1
+```{r}
+    mod_1_coef <- coef(mod_1)
+    mod_1_coef <- as.data.frame (mod_1_coef$DEP)
+    mod_1_coef$DEP <-row.names(mod_1_coef)
+    mod_1_coef <- mod_1_coef %>% 
+      rename(coeff_intercept_mod_1 = '(Intercept)',
+             coeff_peudenses_mod_1 = peudenses1)
+
+    dep_fr <- dep_fr %>% 
+      left_join(mod_1_coef, by = "DEP")
+
+    ggplot(data = dep_fr) +
+      geom_sf(aes(fill = coeff_peudenses_mod_1))  +
+      scale_fill_viridis_c(option = "viridis") +
+      ggtitle("Distribution par département des coefficients liés à la densité (effet fixe) - Modèle 1")
+
+```
+
+=> La cartographie des coefficients liés à la densité (par départament) révèle que tous les départements sont "logés à la meme enseigne" avec une valeur de 0.28 ce qui est logique car le modèle spécifie un **effet fixe** pour la densité. Le coefficent de 0.28 correspond bien à l'Estimate des Fixed effects donné par le modèle.
+
+Cartographie des résidus au niveau des départements pour le modèle 1
+```{r}
+    mod_1_residDep<-ranef(mod_1)
+    mod_1_residDep <- as.data.frame (mod_1_residDep$DEP)
+
+    mod_1_residDep$DEP <-row.names(mod_1_residDep)
+
+    mod_1_residDep <- mod_1_residDep %>% 
+      rename(residDep_mod_1 = '(Intercept)')
+
+    dep_fr <- dep_fr %>% 
+      left_join(mod_1_residDep, by = "DEP")
+
+    ggplot(data = dep_fr) +
+      geom_sf(aes(fill = residDep_mod_1))  +
+      scale_fill_viridis_c(option = "viridis") +
+      ggtitle("Distribution par département des résidus de niveau 2 (département) 
+              - Modèle 1")
+
+```
+
+=> La carte révèle que certains départements ont un taux de variation supérieur (résidu positif - en jaune) ou inférieur (résidu négatif - bleu foncé) à celui modélisé par le modèle 1. Peut-être que les départements avec des résidus positifs sont ceux où il y a des grandes villes? Hypothèses à tester! 
+
+
+## Question D - Est-ce que le taux de variation des communes est aussi associé à la présence d'une grande ville dans le département ?
+
+Créer variable au niveau du département : présence/absence d'une commune > 150 000 hb. et la rapatrier au niveau de la table communes
+```{r}
+    maxpop_dep <- pop_comm %>% 
+      group_by(DEP) %>% 
+      summarise(max_P17_POP = max (P17_POP))
+    maxpop_dep$gdcommuneInDep <- ifelse (maxpop_dep$max_P17_POP > 150000, 1, 0)
+    maxpop_dep$gdcommuneInDep <- as.factor (maxpop_dep$gdcommuneInDep)
+    
+    pop_comm <- pop_comm %>%
+      left_join(maxpop_dep, by = "DEP")
+
+    table (pop_comm$gdcommuneInDep)
+
+```
+
+Cartographier les départements avec des grandes communes
+et comparer la carte avec la carte précédente (Carte des résidus de niveau 2 - Modèle 1 )
+```{r}
+    dep_fr <- dep_fr %>%
+      left_join(maxpop_dep, by = "DEP")
+
+    ggplot(data = dep_fr) +
+      geom_sf(aes(fill = gdcommuneInDep))  +
+      ggtitle("Les départements avec/sans commune de plus de 150 000 habitants)")
+
+```
+
+
+Modèle 2, avec la variable "densité" comme variable explicative au niveau des communes et une autre variable "présence d'une grande commune" au niveau des départements (effets fixes)
+```{r}
+    mod_2<-lmer (txvar ~ 1 + peudenses + gdcommuneInDep + (1 | DEP),data=pop_comm, REML = FALSE)
+    summary(mod_2)
+
+```
+=> Le taux de variation des communes est associé à la présence de "grande commune" (> 150 000 habitants) dans le département. Comparées aux communes situées dans un département sans "grande commune", les communes situées dans un département avec une "grande commune" ont un taux de variation plus élevé (+ 0.378%).
+
+
+Cartographie des résidus au niveau des départements pour le modèle 2
+```{r}
+    mod_2_residDep<-ranef(mod_2)
+    mod_2_residDep <- as.data.frame (mod_2_residDep$DEP)
+
+    mod_2_residDep$DEP <-row.names(mod_2_residDep)
+
+    mod_2_residDep <- mod_2_residDep %>% 
+      rename(residDep_mod_2 = '(Intercept)')
+
+    dep_fr <- dep_fr %>% 
+      left_join(mod_2_residDep, by = "DEP")
+
+    ggplot(data = dep_fr) +
+      geom_sf(aes(fill = residDep_mod_2))  +
+      scale_fill_viridis_c(option = "viridis") +
+      ggtitle("Distribution par département des résidus de niveau 2 (département) 
+              - Modèle 2")
+
+```
+=> On n'observe pas de grands changements entre cette carte des résidus de niveau 2 pour le modèle 2 et la carte des résidus de niveau 2 pour le modèle 1 : ce sont les mêmes départements qui présentent des résidus positifs et des résidus négatifs. D'autres variables explicatives mériteraient d'être encore explorées...
+
+
+## Question E - Est-ce que la différence inter-departementale dans les taux de variation s'explique par la composition des communes des départements en termes de densité (effets de composition) ? et par la présence d'une grande ville dans le département (effet de contexte) ?
+
+Comparaison de la variance intra et inter departement entre les modèles 0, 1 et 2
+```{r}
+# Modèle Nul
+summary_stat <- data.frame()
+summary_stat["mod_0","N"] <- dim(mod_0@frame)[1] 
+summary_stat["mod_0", "AIC" ] <-summary(mod_0)$AIC[1][[1]]
+summary_stat["mod_0", "BIC" ] <- summary(mod_0)$AIC[2][[1]]
+summary_stat["mod_0", "vrn1" ] <- as.data.frame(summary(mod_0)$varcor)[2,]$vcov 
+summary_stat["mod_0", "vrn2" ] <- summary(mod_0)$varcor[1][[1]][[1]]
+
+summary_stat["mod_0", "Total_Var" ] <- summary_stat$vrn2[1] + summary_stat$vrn1[1]
+summary_stat["mod_0", "ICC" ] <- summary_stat$vrn2[1] / summary_stat$Total_Var[1]
+summary_stat["mod_0", "InterClass" ] <- summary_stat$vrn1[1] / summary_stat$Total_Var[1]
+
+# Modèle 1
+summary_stat["mod_1","N"] <- dim(mod_1@frame)[1] 
+summary_stat["mod_1", "AIC" ] <-summary(mod_1)$AIC[1][[1]]
+summary_stat["mod_1", "BIC" ] <- summary(mod_1)$AIC[2][[1]]
+summary_stat["mod_1", "vrn1" ] <- as.data.frame(summary(mod_1)$varcor)[2,]$vcov 
+summary_stat["mod_1", "vrn2" ] <- summary(mod_1)$varcor[1][[1]][[1]]
+
+summary_stat["mod_1", "Total_Var" ] <- summary_stat$vrn2[2] + summary_stat$vrn1[2]
+summary_stat["mod_1", "ICC" ] <- summary_stat$vrn2[2] / summary_stat$Total_Var[2]
+summary_stat["mod_1", "InterClass" ] <- summary_stat$vrn1[2] / summary_stat$Total_Var[2]
+
+
+# Modèle 2
+summary_stat["mod_2","N"] <- dim(mod_2@frame)[1] 
+summary_stat["mod_2", "AIC" ] <-summary(mod_2)$AIC[1][[1]]
+summary_stat["mod_2", "BIC" ] <- summary(mod_2)$AIC[2][[1]]
+summary_stat["mod_2", "vrn1" ] <- as.data.frame(summary(mod_2)$varcor)[2,]$vcov 
+summary_stat["mod_2", "vrn2" ] <- summary(mod_2)$varcor[1][[1]][[1]]
+
+summary_stat["mod_2", "Total_Var" ] <- summary_stat$vrn2[3] + summary_stat$vrn1[3]
+summary_stat["mod_2", "ICC" ] <- summary_stat$vrn2[3] / summary_stat$Total_Var[3]
+summary_stat["mod_2", "InterClass" ] <- summary_stat$vrn1[3] / summary_stat$Total_Var[3]
+summary_stat
+```
+=> Les **variances** de niveau 1 et de niveau 2 diminuent entre les différents modèles. La part de la variance attribuable au niveau 2 passe de 10,5% dans le modèle vide à 8,5% dans le modèle 2.
+Les **différences départementales** des taux de variation peuvent s'expliquer par un **effet de composition** (les départements ont plus ou moins de communes peu denses)  et un **effet de contexte** (des départements avec ou sans grande commune). 
+
+## Question F - L'effet de la densité des communes varie-t-il selon les départements?
+
+Modèle 3, avec la variable "peudenses : Oui/Non" comme variable explicative au niveau des communes **(effet aléaloire)**
+```{r}
+    mod_3<-lmer (txvar ~ 1 + peudenses + gdcommuneInDep + (1 + peudenses | DEP),data=pop_comm, REML = FALSE)
+    summary(mod_3)
+    confint(mod_3, oldNames=FALSE)
+```
+=> L'effet fixe associé au fait d'être une commune peu dense est toujours positif (et statistiquement significatif). Idem pour le fait d'être dans un département avec une "grande "commune". 
+
+=> L'écart type de l'effet aléaltoire de la densité est de 0.2592 avec un intervalle de confiance entre 0.21 et 0.318 (cf. sd_peudenses1|DEP). 
+Il est alors intéressant de faire une carte pour savoir comment varie l'effet de la densité selon les départements.
+
+
+
+Cartographie par département des coefficients liés à la densité (effet aléatoire) pour le modèle 3
+```{r}
+    mod_3_coef <- coef(mod_3)
+    mod_3_coef <- as.data.frame (mod_3_coef$DEP)
+    mod_3_coef$DEP <-row.names(mod_3_coef)
+    mod_3_coef <- mod_3_coef %>% 
+      rename(coeff_intercept_mod_3 = '(Intercept)',
+             coeff_peudenses_mod_3 = peudenses1)
+
+    dep_fr <- dep_fr %>% 
+      left_join(mod_3_coef, by = "DEP")
+
+
+    ggplot(data = dep_fr) +
+      geom_sf(aes(fill = coeff_peudenses_mod_3))  +
+      scale_fill_viridis_c(option = "viridis") +
+      ggtitle(" Distribution par département des coefficients liés à la densité (effet aléatoire) - Modèle 3") +
+      scale_fill_stepsn(
+                  colors = c("#a6cee3", "#ffffc0", "#fc8d59", "#e34a33", "#b30000"),
+                  breaks = c(-0.5, -0.1, 0.1, 0.5))
+
+    
+```
+
+=> L'effet associé au fait d'être une commune peu dense varie selon les départements.
+Dans les departements de la grande couronne d'Ile-de-France (en bleu clair sur la carte), cet effet est par exemple négatif.
+A l'inverse cet effet est positif (et assez fort) dans certains départements situés en Corse, en Bretagne ou dans le Massif-central etc. (en rouge sur la carte)
+
+
+Comparaison de la variance intra et inter departement entre les modèles 0, 1, 2 et 3
+```{r}
+# Modéle 3
+summary_stat["mod_3","N"] <- dim(mod_3@frame)[1] 
+summary_stat["mod_3", "AIC" ] <-summary(mod_3)$AIC[1][[1]]
+summary_stat["mod_3", "BIC" ] <- summary(mod_3)$AIC[2][[1]]
+summary_stat["mod_3", "vrn1" ] <- as.data.frame(summary(mod_3)$varcor)[2,]$vcov 
+summary_stat["mod_3", "vrn2" ] <- summary(mod_3)$varcor[1][[1]][[1]]
+
+summary_stat["mod_3", "Total_Var" ] <- summary_stat$vrn2[4] + summary_stat$vrn1[4]
+summary_stat["mod_3", "ICC" ] <- summary_stat$vrn2[4] / summary_stat$Total_Var[4]
+summary_stat["mod_3", "InterClass" ] <- summary_stat$vrn1[4] / summary_stat$Total_Var[4]
+
+summary_stat
+```
+
+=> En spécifiant dans le modèle un effet aléatoire pour la densité, on observe que la **variance** de niveau 1 (entre communes) diminue très fortement (de 1.64 à 0.067). La part de la variance attribuable au niveau 2 (entre departement) reste stable (autour de 0.16). Il reste donc encore à creuser ce qui se produire comme effet "departemenatal". Cf. carte des résidus de niveau 2.
+
+Cartographie des résidus au niveau des départements pour le modèle 3
+```{r}
+
+    mod_3_residDep<-ranef(mod_3)
+    mod_3_residDep <- as.data.frame (mod_3_residDep$DEP)
+
+    mod_3_residDep$DEP <-row.names(mod_3_residDep)
+
+    mod_3_residDep <- mod_3_residDep %>% 
+      rename(residDep_mod_3 = '(Intercept)')
+
+    dep_fr <- dep_fr %>% 
+      left_join(mod_3_residDep, by = "DEP")
+
+    ggplot(data = dep_fr) +
+      geom_sf(aes(fill = residDep_mod_3))  +
+      scale_fill_viridis_c(option = "viridis") +
+      ggtitle("Distribution par département des résidus de niveau 2 (département) - Modèle 3")
+```
