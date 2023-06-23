@@ -37,7 +37,7 @@ Sources: *Ay J.S., Hilal M., 2020, « Les déterminants naturels et politiques d
 
 
 ```{r}
-vignobles <- st_read("Data/Geo/Vignobles_prix.shp",
+vignobles <- st_read("Data/Vignobles_prix.shp",
                      stringsAsFactors = T) %>% 
   st_transform(crs = "EPSG:2154")
 summary(vignobles)
@@ -60,7 +60,7 @@ Il s'agit des communes de Côte d'Or. On a dans un tableau les caractéristiques
 Source: *https://geo.data.gouv.fr/en/datasets/cac9f2c0de2d3a0209af2080854b6f6a7ee3d9f4*
 
 ```{r}
-communes <- st_read("Data/Geo/communes.shp",
+communes <- st_read("Data/communes.shp",
                      stringsAsFactors = T) %>% 
   st_transform(crs = "EPSG:2154")
 summary(communes)
@@ -582,7 +582,8 @@ ggplot(data = mn3_ranef) +
   geom_text_repel(data = mn3_ranef[abs(mn3_ranef$penteQuality) > 0.25,],
                         aes(label = nom_comm, geometry = geometry),
                   stat = "sf_coordinates",size=3, colour="black") +
-  labs(title = "Distribution des effets aléatoires de la variable Quality selon les communes")
+  labs(title = "Distribution des effets aléatoires /
+       de la variable Quality selon les communes")
 ```
 
 Résultats différents entre **Côte de Beaune** (et en particulier Pommard) où les vignobles de grande qualité physique sont globalement associés à des prix **plus élevés** et **Côte de Nuits** et **Côte d'Or** (et en particulier Nuits-St-Georges) où les vignobles de grande qualité physique sont globalement associés à des prix **moins élevés**...
