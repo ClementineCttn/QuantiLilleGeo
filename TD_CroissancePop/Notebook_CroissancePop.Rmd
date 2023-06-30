@@ -21,8 +21,6 @@ library(languageR)
 library (dplyr)
 ```
 
-## Créer un dossier "Data" et définir le working directory
-setwd("~/Cours/2023_QuantiLille_Multiniveaux/QuantiLilleGeo/TD_CroissancePop/Data")
 
 ## Charger les données issues de la fiche Insee
 Fiche INSEE : <https://www.insee.fr/fr/statistiques/4267787>
