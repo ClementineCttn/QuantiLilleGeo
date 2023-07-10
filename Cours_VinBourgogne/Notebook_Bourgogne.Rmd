@@ -37,8 +37,7 @@ Sources: *Ay J.S., Hilal M., 2020, « Les déterminants naturels et politiques d
 
 
 ```{r}
-vignobles <- st_read("Data/Vignobles_prix.shp",
-                     stringsAsFactors = T) %>% 
+vignobles <- st_read("Data/Vignobles_prix.shp") %>% 
   st_transform(crs = "EPSG:2154")
 summary(vignobles)
 
