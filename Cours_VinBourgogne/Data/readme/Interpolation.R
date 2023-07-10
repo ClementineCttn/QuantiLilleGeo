@@ -6,6 +6,9 @@ library(tidyverse)
 ## Données issues de : 
 # https://journals.openedition.org/cybergeo/36443
 # https://cesaer-datas.inra.fr/geoind/
+# Données en license Etalab 2.0. 
+# Ay, Jean-Sauveur, 2019, "Classification statistique des vignobles de Côte d'Or", https://doi.org/10.15454/ZZWQMN, Recherche Data Gouv, V4
+
   
 polyras <- st_read("PolyRas.shp") %>% st_transform(crs = "EPSG:2154")
 
